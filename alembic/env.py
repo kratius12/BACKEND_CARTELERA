@@ -19,7 +19,7 @@ from app.core.config import settings
 
 target_metadata = Base.metadata
 
-sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://").replace("postgres://", "postgresql://")
 config.set_main_option("sqlalchemy.url", sync_url)
 
 # other values from the config, defined by the needs of env.py,
