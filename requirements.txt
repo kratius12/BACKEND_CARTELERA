@@ -9,3 +9,5 @@ alembic
 python-dotenv
 greenlet
 python-multipart
+PyJWT
+bcrypt
