@@ -1,8 +1,45 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, desc, func
 from datetime import date
-from app.models.program import MeetingProgram, MeetingProgramStaging
+from app.models.program import MeetingProgram, MeetingProgramStaging, AssignmentHistory
 from app.schemas.program import ProgramCreate, ProgramUpdate
+
+async def _sync_assignment_history(db: AsyncSession, program_id: int, week_start: date, payload: dict):
+    # Borrar historial viejo
+    await db.execute(delete(AssignmentHistory).where(AssignmentHistory.program_id == program_id))
+    
+    parts = payload.get("parts", [])
+    history_entries = []
+    
+    for part in parts:
+        if part.get("type") == "section":
+            for item in part.get("items", []):
+                assigned = item.get("assigned", [])
+                
+                title = (item.get("text") or "").lower()
+                is_demostracion = "empiece" in title or "haga" in title or "explique" in title
+                part_type = "demostracion" if is_demostracion else "discurso"
+
+                student = assigned[0] if len(assigned) > 0 else None
+                assistant = assigned[1] if len(assigned) > 1 else None
+
+                if student and "❌" in student: student = None
+                if assistant and "❌" in assistant: assistant = None
+                
+                if not student:
+                    continue
+                    
+                entry = AssignmentHistory(
+                    program_id=program_id,
+                    week_start=week_start,
+                    student_name=student.strip(),
+                    assistant_name=assistant.strip() if assistant else None,
+                    part_type=part_type
+                )
+                history_entries.append(entry)
+                
+    if history_entries:
+        db.add_all(history_entries)
 
 async def get_current_program_id(db: AsyncSession, today: date) -> int:
     stmt = (
@@ -72,9 +109,6 @@ async def get_staging_program(db: AsyncSession, prog_id: int):
     return result.scalar_one_or_none()
 
 async def create_staging_program(db: AsyncSession, program: ProgramCreate):
-    # Calculate next id
-    # Note: In postgres, usually id is a SEQUENCE. If the old DB didn't use a sequence,
-    # we simulate the old logic: COALESCE(MAX(id), 0) + 1
     max_id_stmt = select(func.coalesce(func.max(MeetingProgramStaging.id), 0) + 1)
     result = await db.execute(max_id_stmt)
     next_id = result.scalar_one()
@@ -123,6 +157,10 @@ async def update_program(db: AsyncSession, prog_id: int, program: ProgramUpdate)
         .returning(MeetingProgram.id)
     )
     result = await db.execute(stmt)
+    
+    # Update assignment history
+    await _sync_assignment_history(db, prog_id, program.week_start, program.payload)
+    
     await db.commit()
     return result.scalar_one_or_none()
 
@@ -152,7 +190,10 @@ async def publish_program(db: AsyncSession, prog_id: int):
     )
     db.add(db_prog)
 
-    # 4. Delete from staging
+    # 4. Sync history
+    await _sync_assignment_history(db, next_id, staging_prog.week_start, staging_prog.payload)
+
+    # 5. Delete from staging
     stmt_del = delete(MeetingProgramStaging).where(MeetingProgramStaging.id == prog_id)
     await db.execute(stmt_del)
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.routes import health, public, admin, auth, users
+from app.api.routes import health, public, admin, auth, users, students, cleaning
 from app.api.dependencies import get_current_admin_user
 
 api_router = APIRouter()
@@ -9,6 +9,18 @@ api_router.include_router(
     admin.router, 
     prefix="/admin/programs", 
     tags=["admin"],
+    dependencies=[Depends(get_current_admin_user)]
+)
+api_router.include_router(
+    students.router,
+    prefix="/admin/students",
+    tags=["students"],
+    dependencies=[Depends(get_current_admin_user)]
+)
+api_router.include_router(
+    cleaning.router,
+    prefix="/admin/cleaning",
+    tags=["cleaning"],
     dependencies=[Depends(get_current_admin_user)]
 )
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
