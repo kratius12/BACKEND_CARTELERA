@@ -10,7 +10,27 @@ from app.schemas.program import ProgramCreate, ProgramUpdate, ProgramListRespons
 from app.crud import program as crud_program
 from app.services.pdf_parser import parse_mwb_pdf
 
+from fastapi import Request
+
 router = APIRouter()
+
+@router.post("/generate-proposal")
+async def generate_proposal_endpoint(request: Request, db: AsyncSession = Depends(get_db)):
+    data = await request.json()
+    items = data.get("items", [])
+    from app.services.assigner import generate_proposal
+    new_items = await generate_proposal(db, items)
+    return {"items": new_items}
+
+@router.post("/validate")
+async def validate_program_endpoint(request: Request, db: AsyncSession = Depends(get_db)):
+    data = await request.json()
+    payload = data.get("payload", {})
+    prog_id = data.get("prog_id") # Opcional, para ignorar el programa actual en chequeos históricos
+    
+    from app.services.validator import validate_program_payload
+    warnings = await validate_program_payload(db, payload, prog_id)
+    return {"warnings": warnings}
 
 @router.get("/staging", response_model=List[ProgramListResponse])
 async def list_staging_programs(db: AsyncSession = Depends(get_db)):
