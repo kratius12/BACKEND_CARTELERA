@@ -16,7 +16,19 @@ from datetime import datetime
 async def create_student(db: AsyncSession, student: StudentCreate):
     student_data = student.dict(exclude_unset=True)
     if not student_data.get("created_at"):
-        student_data["created_at"] = datetime.now() # Object natively injected
+        student_data["created_at"] = datetime.now()
+    
+    # Defaults based on gender
+    if student_data.get("gender") == 0:  # Mujeres
+        student_data["aseo"] = student_data.get("aseo", False)
+        student_data["acomodador"] = student_data.get("acomodador", False)
+        student_data["microfonos"] = student_data.get("microfonos", False)
+    elif student_data.get("gender") == 1:  # Hombres
+        if student_data.get("status") == "Activo":
+            # Set to True if not explicitly provided
+            if "aseo" not in student_data: student_data["aseo"] = True
+            if "acomodador" not in student_data: student_data["acomodador"] = True
+            if "microfonos" not in student_data: student_data["microfonos"] = True
         
     db_student = Student(**student_data)
     db.add(db_student)
