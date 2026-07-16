@@ -1,38 +1,52 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 
 from app.api.dependencies import get_db
-from app.services.cleaning import generate_cleaning_pairs, get_cleaning_history
+from app.services.cleaning import generate_cleaning_pairs, get_cleaning_history, assign_cleaning_roles_for_week
 
 router = APIRouter()
 
 @router.get("/history", response_model=List[Dict[str, Any]])
-async def api_get_cleaning_history(
+def api_get_cleaning_history(
     limit: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Obtiene el historial de asignaciones de aseo.
     """
     try:
-        history = await get_cleaning_history(db, limit)
+        history = get_cleaning_history(db, limit)
         return history
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate", response_model=List[Dict[str, Any]])
-async def api_generate_cleaning_pairs(
+def api_generate_cleaning_pairs(
     n_pairs: int = Query(5, ge=1, le=50, alias="n_parejas_a_generar"),
     start_date: str = Query(None, description="Fecha de inicio en formato YYYY-MM-DD"),
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Genera e inserta `n_parejas_a_generar` basándose en la secuencia cíclica y
     el último registro en la base de datos.
     """
     try:
-        nuevas_parejas = await generate_cleaning_pairs(db, n_parejas_a_generar=n_pairs, start_date=start_date)
+        nuevas_parejas = generate_cleaning_pairs(db, n_parejas_a_generar=n_pairs, start_date=start_date)
         return nuevas_parejas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/assign-roles", response_model=List[Dict[str, Any]])
+def api_assign_cleaning_roles(
+    db: Session = Depends(get_db)
+):
+    """
+    Asigna encargados y supervisores automáticamente a todos los registros de aseo
+    que todavía no tienen encargado o supervisor.
+    """
+    try:
+        asignaciones = assign_cleaning_roles_for_week(db)
+        return asignaciones
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

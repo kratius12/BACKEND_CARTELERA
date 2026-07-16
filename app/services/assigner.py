@@ -1,14 +1,14 @@
 import random
 import json
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, or_, desc
 from app.models.student import Student
 from app.models.program import MeetingProgram
 
-async def fetch_historical_data(db: AsyncSession):
+def fetch_historical_data(db: Session):
     # 1. Traer los ultimos 5 programas publicados para marcar descansos
     query_last_5 = select(MeetingProgram).order_by(desc(MeetingProgram.week_start)).limit(5)
-    result_5 = await db.execute(query_last_5)
+    result_5 = db.execute(query_last_5)
     last_5_programs = result_5.scalars().all()
 
     # Extraer names que participaron en los últimos 5 programas
@@ -18,7 +18,7 @@ async def fetch_historical_data(db: AsyncSession):
     # Para historical pairs, idealmente traemos TODO el histórico, 
     # pero para optimizar podemos traer los ultimos 50 o todos si no son muchos.
     query_all = select(MeetingProgram)
-    result_all = await db.execute(query_all)
+    result_all = db.execute(query_all)
     all_programs = result_all.scalars().all()
 
     def add_pair(n1, n2):
@@ -61,12 +61,12 @@ async def fetch_historical_data(db: AsyncSession):
 
     return recent_names, historical_pairs
 
-async def generate_proposal(db: AsyncSession, items: list):
+def generate_proposal(db: Session, items: list):
     # Obtener data historica
-    recent_names, historical_pairs = await fetch_historical_data(db)
+    recent_names, historical_pairs = fetch_historical_data(db)
 
     # Obtener todos los estudiantes activos
-    result = await db.execute(select(Student).filter(Student.status.ilike('activo')))
+    result = db.execute(select(Student).filter(Student.status.ilike('activo')))
     active_students = result.scalars().all()
 
     # Mezclar aleatoriamente

@@ -1,22 +1,25 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker, declarative_base
+from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
-# Modify the DATABASE_URL to use asyncpg if not explicitly provided
-db_url = settings.DATABASE_URL
+# Usa URL interna de Railway si está disponible, si no la pública
+db_url = settings.db_url
+
+# Normalizar a psycopg2 (sync, probado con alembic)
+for prefix in ("postgresql+asyncpg://", "postgresql+psycopg://", "postgres://"):
+    if db_url.startswith(prefix):
+        db_url = "postgresql+psycopg2://" + db_url[len(prefix):]
+        break
 if db_url.startswith("postgresql://"):
-    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-elif db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    db_url = "postgresql+psycopg2://" + db_url[len("postgresql://"):]
 
-engine = create_async_engine(db_url, echo=False)
+engine = create_engine(db_url, echo=False, poolclass=NullPool)
 
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine, class_=AsyncSession, expire_on_commit=False
-)
+SessionLocal = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
 
 Base = declarative_base()
 
-async def get_db():
-    async with AsyncSessionLocal() as session:
+def get_db():
+    with SessionLocal() as session:
         yield session

@@ -1,7 +1,6 @@
 fastapi
 uvicorn
 sqlalchemy
-asyncpg
 psycopg2-binary
 pydantic
 pydantic-settings
@@ -12,3 +11,7 @@ python-multipart
 PyJWT
 bcrypt
 email-validator
+PyPDF2
+requests
+beautifulsoup4
+lxml

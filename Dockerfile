@@ -26,4 +26,4 @@ COPY . .
 EXPOSE 3001
 
 # Command to run migrations and then start the server
-CMD ["sh", "-c", "python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3001}"]
+CMD ["sh", "-c", "for i in 1 2 3 4 5; do alembic upgrade head && break || sleep 5; done; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3001}"]

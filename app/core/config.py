@@ -1,14 +1,38 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn
+from pydantic import field_validator
+
+_DEFAULT_SECRET = "your-super-secret-key-change-it-in-production"
 
 class Settings(BaseSettings):
     PORT: int = 3001
     DATABASE_URL: str
-    
-    # JWT Settings
-    SECRET_KEY: str = "your-super-secret-key-change-it-in-production"
+    DATABASE_PRIVATE_URL: str = ""
+
+    @property
+    def db_url(self) -> str:
+        return self.DATABASE_PRIVATE_URL or self.DATABASE_URL
+
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ALLOWED_ORIGINS: str = ""
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if v == _DEFAULT_SECRET:
+            raise ValueError(
+                "SECRET_KEY no puede ser el valor por defecto. "
+                "Define SECRET_KEY en tu archivo .env con al menos 32 caracteres aleatorios."
+            )
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY debe tener al menos 32 caracteres.")
+        return v
+
+    def get_allowed_origins(self) -> list:
+        if not self.ALLOWED_ORIGINS.strip():
+            return []
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="allow")
 

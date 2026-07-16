@@ -1,56 +1,52 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Body
 import os
 import shutil
 import tempfile
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from sqlalchemy.orm import Session
+from typing import List, Any
 
 from app.api.dependencies import get_db
 from app.schemas.program import ProgramCreate, ProgramUpdate, ProgramListResponse, ProgramResponse
 from app.crud import program as crud_program
 from app.services.pdf_parser import parse_mwb_pdf
-
-from fastapi import Request
+from app.services.mwb_scraper import parse_mwb_from_url
 
 router = APIRouter()
 
 @router.post("/generate-proposal")
-async def generate_proposal_endpoint(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+def generate_proposal_endpoint(data: dict = Body(...), db: Session = Depends(get_db)):
     items = data.get("items", [])
     from app.services.assigner import generate_proposal
-    new_items = await generate_proposal(db, items)
+    new_items = generate_proposal(db, items)
     return {"items": new_items}
 
 @router.post("/validate")
-async def validate_program_endpoint(request: Request, db: AsyncSession = Depends(get_db)):
-    data = await request.json()
+def validate_program_endpoint(data: dict = Body(...), db: Session = Depends(get_db)):
     payload = data.get("payload", {})
-    prog_id = data.get("prog_id") # Opcional, para ignorar el programa actual en chequeos históricos
-    
+    prog_id = data.get("prog_id")
     from app.services.validator import validate_program_payload
-    warnings = await validate_program_payload(db, payload, prog_id)
+    warnings = validate_program_payload(db, payload, prog_id)
     return {"warnings": warnings}
 
 @router.get("/staging", response_model=List[ProgramListResponse])
-async def list_staging_programs(db: AsyncSession = Depends(get_db)):
-    programs = await crud_program.get_staging_programs(db)
+def list_staging_programs(db: Session = Depends(get_db)):
+    programs = crud_program.get_staging_programs(db)
     return programs
 
 @router.get("/staging/{prog_id}", response_model=ProgramResponse)
-async def get_staging_program_by_id(prog_id: int, db: AsyncSession = Depends(get_db)):
-    program = await crud_program.get_staging_program(db, prog_id)
+def get_staging_program_by_id(prog_id: int, db: Session = Depends(get_db)):
+    program = crud_program.get_staging_program(db, prog_id)
     if not program:
         raise HTTPException(status_code=404, detail="No encontrado en staging")
     return program
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_program_in_staging(program: ProgramCreate, db: AsyncSession = Depends(get_db)):
-    db_prog = await crud_program.create_staging_program(db, program)
+def create_program_in_staging(program: ProgramCreate, db: Session = Depends(get_db)):
+    db_prog = crud_program.create_staging_program(db, program)
     return {"id": db_prog.id, "message": "Guardado en staging"}
 
 @router.post("/upload-pdf", status_code=status.HTTP_201_CREATED)
-async def upload_pdf_program(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+def upload_pdf_program(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
     
@@ -62,7 +58,12 @@ async def upload_pdf_program(file: UploadFile = File(...), db: AsyncSession = De
             
         # Parse the pdf
         parsed_programs = parse_mwb_pdf(temp_path, file.filename)
-        
+        if not parsed_programs:
+            raise HTTPException(
+                status_code=400,
+                detail="El PDF se procesó correctamente, pero no se pudo extraer ningún programa. Revisa el formato de la guía."
+            )
+
         # Save each parsed program to staging
         created_ids = []
         for program_data in parsed_programs:
@@ -79,49 +80,77 @@ async def upload_pdf_program(file: UploadFile = File(...), db: AsyncSession = De
                 payload=program_data
             )
             
-            db_prog = await crud_program.create_staging_program(db, p_create)
+            db_prog = crud_program.create_staging_program(db, p_create)
             created_ids.append(db_prog.id)
             
         return {"message": f"Se extrajeron {len(created_ids)} programas", "ids": created_ids}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Cleanup
-        os.close(fd)
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        try:
+            os.close(fd)
+        except Exception:
+            pass
 
-@router.put("/staging/{prog_id}")
-async def update_program_in_staging(prog_id: int, program: ProgramUpdate, db: AsyncSession = Depends(get_db)):
-    updated_id = await crud_program.update_staging_program(db, prog_id, program)
-    if not updated_id:
-        raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
-    return {"id": updated_id, "message": "Staging actualizado"}
+
+@router.post("/import-url", status_code=status.HTTP_201_CREATED)
+def import_mwb_from_url(data: dict = Body(...), db: Session = Depends(get_db)):
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Se requiere el campo 'url'")
+
+    try:
+        parsed_programs = parse_mwb_from_url(url)
+        if not parsed_programs:
+            raise HTTPException(status_code=400, detail="No se extrajeron programas desde la URL proporcionada")
+
+        created_ids = []
+        for program_data in parsed_programs:
+            p_week_start = program_data.pop("week_start")
+            p_week_end = program_data.pop("week_end")
+
+            p_create = ProgramCreate(
+                week_start=p_week_start,
+                week_end=p_week_end,
+                payload=program_data
+            )
+
+            db_prog = crud_program.create_staging_program(db, p_create)
+            created_ids.append(db_prog.id)
+
+        return {"message": f"Se extrajeron {len(created_ids)} programas desde la URL", "ids": created_ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/staging/{prog_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_staging_prog(prog_id: int, db: AsyncSession = Depends(get_db)):
-    success = await crud_program.delete_staging_program(db, prog_id)
+def delete_staging_prog(prog_id: int, db: Session = Depends(get_db)):
+    success = crud_program.delete_staging_program(db, prog_id)
     if not success:
         raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
     return None
 
 @router.post("/{prog_id}/publish")
-async def publish_program(prog_id: int, db: AsyncSession = Depends(get_db)):
-    db_prog = await crud_program.publish_program(db, prog_id)
+def publish_program(prog_id: int, db: Session = Depends(get_db)):
+    db_prog = crud_program.publish_program(db, prog_id)
     if not db_prog:
         raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
     return {"id": db_prog.id, "message": "Publicado exitosamente"}
 
 @router.put("/{prog_id}")
-async def update_published_program(prog_id: int, program: ProgramUpdate, db: AsyncSession = Depends(get_db)):
-    updated_id = await crud_program.update_program(db, prog_id, program)
+def update_published_program(prog_id: int, program: ProgramUpdate, db: Session = Depends(get_db)):
+    updated_id = crud_program.update_program(db, prog_id, program)
     if not updated_id:
         raise HTTPException(status_code=404, detail="Programa publicado no encontrado")
     return {"id": updated_id, "message": "Programa actualizado"}
 
 @router.delete("/{prog_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_published_prog(prog_id: int, db: AsyncSession = Depends(get_db)):
-    success = await crud_program.delete_program(db, prog_id)
+def delete_published_prog(prog_id: int, db: Session = Depends(get_db)):
+    success = crud_program.delete_program(db, prog_id)
     if not success:
         raise HTTPException(status_code=404, detail="Programa publicado no encontrado")
     return None

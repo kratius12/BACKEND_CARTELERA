@@ -1,12 +1,12 @@
 import random
 from datetime import date, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, desc, func, and_
 from app.models.assignments import MicrophoneAssignment, AttendantAssignment
 from app.models.student import Student
 from app.models.cleaning import CleaningHistory
 
-async def get_available_students(db: AsyncSession, assignment_type: str, for_date: date):
+def get_available_students(db: Session, assignment_type: str, for_date: date):
     """
     Returns students available for a specific assignment type on a specific date,
     excluding those already assigned to cleaning in the same week.
@@ -19,7 +19,7 @@ async def get_available_students(db: AsyncSession, assignment_type: str, for_dat
             CleaningHistory.week_end >= for_date
         )
     )
-    cleaning_res = await db.execute(cleaning_query)
+    cleaning_res = db.execute(cleaning_query)
     cleaning_record = cleaning_res.scalar_one_or_none()
     
     excluded_ids = []
@@ -49,10 +49,10 @@ async def get_available_students(db: AsyncSession, assignment_type: str, for_dat
         .order_by(last_assignment_sub.c.last_date.asc().nullsfirst(), func.random())
     )
     
-    result = await db.execute(query)
+    result = db.execute(query)
     return result.all() # returns list of (Student, last_date)
 
-async def generate_weekly_assignments(db: AsyncSession, assignment_type: str, n_weeks: int = 5, start_date: date = None):
+def generate_weekly_assignments(db: Session, assignment_type: str, n_weeks: int = 5, start_date: date = None):
     """
     Generates assignments for N weeks, one week at a time.
     """
@@ -60,20 +60,24 @@ async def generate_weekly_assignments(db: AsyncSession, assignment_type: str, n_
     
     # 1. Find last assignment date
     last_query = select(Model.date).order_by(desc(Model.date)).limit(1)
-    last_res = await db.execute(last_query)
+    last_res = db.execute(last_query)
     last_date = last_res.scalar_one_or_none()
     
-    current_date = start_date or date.today()
-    if last_date:
+    if start_date:
+        # start_date explícito siempre tiene prioridad
+        current_date = start_date
+    elif last_date:
+        # Continuar desde el último registro
         current_date = last_date + timedelta(days=7)
     else:
-        # Snap to Monday of current week if no last date
-        current_date = current_date - timedelta(days=current_date.weekday())
+        # Sin datos: arrancar desde el lunes de la semana actual
+        today = date.today()
+        current_date = today - timedelta(days=today.weekday())
     
     generated = []
     for _ in range(n_weeks):
         # Pick 2 students for this specific date
-        candidates = await get_available_students(db, assignment_type, current_date)
+        candidates = get_available_students(db, assignment_type, current_date)
         
         if len(candidates) < 2:
             # Maybe we don't have enough students, but we pick what we have
@@ -88,10 +92,10 @@ async def generate_weekly_assignments(db: AsyncSession, assignment_type: str, n_
             
         current_date += timedelta(days=7)
         
-    await db.commit()
+    db.commit()
     return generated
 
-async def get_assignment_history(db: AsyncSession, assignment_type: str, limit: int = 20):
+def get_assignment_history(db: Session, assignment_type: str, limit: int = 20):
     Model = MicrophoneAssignment if assignment_type == "micro" else AttendantAssignment
     from sqlalchemy.orm import selectinload
     
@@ -101,7 +105,7 @@ async def get_assignment_history(db: AsyncSession, assignment_type: str, limit: 
         .order_by(desc(Model.date), desc(Model.id))
         .limit(limit)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     records = result.scalars().all()
     
     return [
