@@ -6,6 +6,12 @@ _DEFAULT_SECRET = "your-super-secret-key-change-it-in-production"
 class Settings(BaseSettings):
     PORT: int = 3001
     DATABASE_URL: str
+    # URL interna de Railway (sin SSL, sin proxy) — preferida cuando está disponible
+    DATABASE_PRIVATE_URL: str = ""
+
+    @property
+    def db_url(self) -> str:
+        return self.DATABASE_PRIVATE_URL or self.DATABASE_URL
 
     # JWT Settings
     SECRET_KEY: str = _DEFAULT_SECRET
