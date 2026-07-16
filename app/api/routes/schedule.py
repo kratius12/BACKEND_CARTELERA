@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from datetime import date, datetime, timedelta
 
@@ -13,10 +13,10 @@ router = APIRouter()
 
 
 @router.post("/generate-all")
-async def generate_all_schedule(
+def generate_all_schedule(
     n_weeks: int = Query(4, ge=1, le=50, description="Semanas a generar"),
     start_date: str = Query(None, description="Fecha de inicio YYYY-MM-DD. Si se omite, se calcula automáticamente."),
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Genera aseo, micrófonos y acomodadores para el mismo rango de semanas.
@@ -30,9 +30,9 @@ async def generate_all_schedule(
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de fecha inválido. Usa YYYY-MM-DD.")
     else:
-        last_cleaning   = (await db.execute(select(func.max(CleaningHistory.week_end)))).scalar()
-        last_micro      = (await db.execute(select(func.max(MicrophoneAssignment.date)))).scalar()
-        last_attendant  = (await db.execute(select(func.max(AttendantAssignment.date)))).scalar()
+        last_cleaning   = (db.execute(select(func.max(CleaningHistory.week_end)))).scalar()
+        last_micro      = (db.execute(select(func.max(MicrophoneAssignment.date)))).scalar()
+        last_attendant  = (db.execute(select(func.max(AttendantAssignment.date)))).scalar()
 
         existing = [d for d in [last_cleaning, last_micro, last_attendant] if d is not None]
         if existing:
@@ -49,13 +49,13 @@ async def generate_all_schedule(
 
     # ── 2. Generar los tres módulos con la misma fecha ────────────────────────
     try:
-        cleaning_records = await generate_cleaning_pairs(
+        cleaning_records = generate_cleaning_pairs(
             db, n_parejas_a_generar=n_weeks, start_date=forced_start_str
         )
-        await assign_cleaning_roles_for_week(db)
+        assign_cleaning_roles_for_week(db)
 
-        micro_records     = await generate_weekly_assignments(db, "micro",     n_weeks, forced_start)
-        attendant_records = await generate_weekly_assignments(db, "attendant", n_weeks, forced_start)
+        micro_records     = generate_weekly_assignments(db, "micro",     n_weeks, forced_start)
+        attendant_records = generate_weekly_assignments(db, "attendant", n_weeks, forced_start)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

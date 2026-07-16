@@ -33,7 +33,7 @@ if os.path.isdir(FRONTEND_DIST):
     
     # Catch-all route para React Router. Cualquier cosa no encontrada por la API de arriba, asume que es una vista de React.
     @app.get("/{full_path:path}")
-    async def serve_react_app(request: Request, full_path: str):
+    def serve_react_app(request: Request, full_path: str):
         # Si la petición busca explícitamente contenido en /api/ y cayó aquí, es un 404 real.
         if full_path.startswith("api/"):
             return {"detail": "Not Found"}
@@ -44,7 +44,7 @@ if os.path.isdir(FRONTEND_DIST):
         return {"detail": "El frontend no ha sido compilado en 'FRONTEND_CARTELERA/dist' aún."}
 else:
     @app.get("/")
-    async def root():
+    def root():
         return {"message": "Cartelera API Running. (Frontend 'dist' no encontrado)"}
 
 if __name__ == "__main__":

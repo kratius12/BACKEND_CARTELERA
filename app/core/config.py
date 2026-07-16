@@ -6,21 +6,15 @@ _DEFAULT_SECRET = "your-super-secret-key-change-it-in-production"
 class Settings(BaseSettings):
     PORT: int = 3001
     DATABASE_URL: str
-    # URL interna de Railway (sin SSL, sin proxy) — preferida cuando está disponible
     DATABASE_PRIVATE_URL: str = ""
 
     @property
     def db_url(self) -> str:
         return self.DATABASE_PRIVATE_URL or self.DATABASE_URL
 
-    # JWT Settings
     SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-
-    # CORS — lista separada por comas en el .env, e.g.:
-    # ALLOWED_ORIGINS=http://localhost:5173,https://tudominio.com
-    # Deja en blanco o no configures para permitir todos los orígenes (solo desarrollo).
     ALLOWED_ORIGINS: str = ""
 
     @field_validator("SECRET_KEY")
@@ -35,8 +29,7 @@ class Settings(BaseSettings):
             raise ValueError("SECRET_KEY debe tener al menos 32 caracteres.")
         return v
 
-    def get_allowed_origins(self) -> list[str]:
-        """Devuelve la lista de orígenes permitidos para CORS."""
+    def get_allowed_origins(self) -> list:
         if not self.ALLOWED_ORIGINS.strip():
             return []
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
