@@ -1,5 +1,5 @@
 [deploy]
-startCommand = "sh -c 'for i in 1 2 3 4 5; do alembic upgrade head && break || sleep 5; done; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3001}'"
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/ping"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
