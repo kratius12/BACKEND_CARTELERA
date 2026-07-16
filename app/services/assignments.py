@@ -63,12 +63,16 @@ async def generate_weekly_assignments(db: AsyncSession, assignment_type: str, n_
     last_res = await db.execute(last_query)
     last_date = last_res.scalar_one_or_none()
     
-    current_date = start_date or date.today()
-    if last_date:
+    if start_date:
+        # start_date explícito siempre tiene prioridad
+        current_date = start_date
+    elif last_date:
+        # Continuar desde el último registro
         current_date = last_date + timedelta(days=7)
     else:
-        # Snap to Monday of current week if no last date
-        current_date = current_date - timedelta(days=current_date.weekday())
+        # Sin datos: arrancar desde el lunes de la semana actual
+        today = date.today()
+        current_date = today - timedelta(days=today.weekday())
     
     generated = []
     for _ in range(n_weeks):

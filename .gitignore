@@ -3,3 +3,10 @@ node_modules
 venv
 *.pyc
 __pycache__
+
+# Scripts de depuracion y utilidades puntuales
+debug_counts.py
+fix_privileges.py
+migrate.py
+test_cleaning.py
+tmp_*.py

@@ -17,35 +17,45 @@ router = APIRouter()
 async def get_full_schedule(db: AsyncSession = Depends(get_db)):
     """
     Returns the consolidated schedule for Aseo, Microphones and Attendants.
-    Limited to the 13 most recent/upcoming weeks.
+    All three tables share the same date range (driven by the cleaning schedule).
     """
     from sqlalchemy.orm import selectinload
-    # 1. Get last 12 cleaning records (newest)
+
+    # 1. Fetch cleaning records first to establish the reference date range
     cleaning_query = select(CleaningHistory).options(
         selectinload(CleaningHistory.encargado),
         selectinload(CleaningHistory.supervisor)
     ).order_by(CleaningHistory.week_start.desc()).limit(12)
-    
-    # 2. Get last assignments (12 weeks * 2 people = 24)
+
+    cleaning_res = await db.execute(cleaning_query)
+    cleaning = cleaning_res.scalars().all()
+
+    # 2. Determine shared date range from cleaning
+    if cleaning:
+        range_start = min(c.week_start for c in cleaning)
+        range_end   = max(c.week_end   for c in cleaning)
+    else:
+        # Fallback: no cleaning data, return empty
+        return {"cleaning": [], "micros": [], "attendants": []}
+
+    # 3. Fetch micros and attendants filtered to the same date range
     micro_query = select(MicrophoneAssignment).options(
         selectinload(MicrophoneAssignment.student)
-    ).order_by(MicrophoneAssignment.date.desc()).limit(24)
-    
+    ).where(
+        and_(MicrophoneAssignment.date >= range_start, MicrophoneAssignment.date <= range_end)
+    ).order_by(MicrophoneAssignment.date.asc())
+
     attendant_query = select(AttendantAssignment).options(
         selectinload(AttendantAssignment.student)
-    ).order_by(AttendantAssignment.date.desc()).limit(24)
-    
-    cleaning_res = await db.execute(cleaning_query)
-    micro_res = await db.execute(micro_query)
+    ).where(
+        and_(AttendantAssignment.date >= range_start, AttendantAssignment.date <= range_end)
+    ).order_by(AttendantAssignment.date.asc())
+
+    micro_res    = await db.execute(micro_query)
     attendant_res = await db.execute(attendant_query)
-    
-    cleaning = cleaning_res.scalars().all()
-    micros = micro_res.scalars().all()
+    micros     = micro_res.scalars().all()
     attendants = attendant_res.scalars().all()
-    
-    # Group by week/date if possible, but the image shows them as separate tables
-    # so we return them as separate lists.
-    
+
     return {
         "cleaning": [
             {
@@ -55,7 +65,7 @@ async def get_full_schedule(db: AsyncSession = Depends(get_db)):
                 "grupo2": c.grupo2,
                 "encargado": c.encargado.name if c.encargado else "N/A",
                 "supervisor": c.supervisor.name if c.supervisor else "N/A"
-            } for c in cleaning
+            } for c in reversed(cleaning)   # oldest → newest for display
         ],
         "micros": [
             {
