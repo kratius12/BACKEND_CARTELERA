@@ -14,27 +14,30 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add columns with server default so existing rows get FALSE without a full table rewrite
-    op.add_column(
-        'students',
-        sa.Column('es_anciano', sa.Boolean(), nullable=False, server_default=sa.false())
-    )
-    op.add_column(
-        'students',
-        sa.Column('es_siervo', sa.Boolean(), nullable=False, server_default=sa.false())
-    )
+    bind = op.get_bind()
+    existing_cols = [c['name'] for c in sa.inspect(bind).get_columns('students')]
 
-    # Populate from existing infoadd data
-    op.execute("""
-        UPDATE students
-        SET es_anciano = TRUE
-        WHERE infoadd IS NOT NULL AND UPPER(infoadd) LIKE '%ANCIANO%'
-    """)
-    op.execute("""
-        UPDATE students
-        SET es_siervo = TRUE
-        WHERE infoadd IS NOT NULL AND UPPER(infoadd) LIKE '%SIERVO%'
-    """)
+    if 'es_anciano' not in existing_cols:
+        op.add_column(
+            'students',
+            sa.Column('es_anciano', sa.Boolean(), nullable=False, server_default=sa.false())
+        )
+        op.execute("""
+            UPDATE students
+            SET es_anciano = TRUE
+            WHERE infoadd IS NOT NULL AND UPPER(infoadd) LIKE '%ANCIANO%'
+        """)
+
+    if 'es_siervo' not in existing_cols:
+        op.add_column(
+            'students',
+            sa.Column('es_siervo', sa.Boolean(), nullable=False, server_default=sa.false())
+        )
+        op.execute("""
+            UPDATE students
+            SET es_siervo = TRUE
+            WHERE infoadd IS NOT NULL AND UPPER(infoadd) LIKE '%SIERVO%'
+        """)
 
 
 def downgrade() -> None:
