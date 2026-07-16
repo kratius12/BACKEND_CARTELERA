@@ -94,9 +94,6 @@ def upload_pdf_program(file: UploadFile = File(...), db: Session = Depends(get_d
             os.close(fd)
         except Exception:
             pass
-    if not updated_id:
-        raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
-    return {"id": updated_id, "message": "Staging actualizado"}
 
 
 @router.post("/import-url", status_code=status.HTTP_201_CREATED)
