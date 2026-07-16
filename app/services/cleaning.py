@@ -1,6 +1,6 @@
 import random
 from datetime import datetime, date, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, desc, or_, func
 from sqlalchemy.orm import selectinload
 from app.models.cleaning import CleaningHistory
@@ -14,16 +14,16 @@ SECUENCIA_BASE = [
     (5, 3), (6, 2), (1, 3), (2, 4), (5, 6), (1, 2), (3, 6)
 ]
 
-async def _get_group_ids_by_numbers(db: AsyncSession, g1_num: int, g2_num: int):
+def _get_group_ids_by_numbers(db: Session, g1_num: int, g2_num: int):
     grp_query = select(Group).where(or_(
         Group.name.ilike(f"%{g1_num}%"),
         Group.name.ilike(f"%{g2_num}%")
     ))
-    groups_res = await db.execute(grp_query)
+    groups_res = db.execute(grp_query)
     groups = groups_res.scalars().all()
     return [g.id for g in groups]
 
-async def _get_last_role_dates(db: AsyncSession, student_ids: list[int], role_field: str):
+def _get_last_role_dates(db: Session, student_ids: list[int], role_field: str):
     if not student_ids:
         return {}
 
@@ -33,7 +33,7 @@ async def _get_last_role_dates(db: AsyncSession, student_ids: list[int], role_fi
         .where(role_col.in_(student_ids))
         .group_by(role_col)
     )
-    res = await db.execute(stmt)
+    res = db.execute(stmt)
     return {student_id: last_date for student_id, last_date in res.all()}
 
 def _sort_by_least_recent(candidates: list[Student], last_dates: dict[int, date]) -> list[Student]:
@@ -48,16 +48,16 @@ def _is_elder(student: Student) -> bool:
 def _is_ministerial(student: Student) -> bool:
     return bool(student.es_siervo)
 
-async def _pick_cleaning_roles(db: AsyncSession, g1_num: int, g2_num: int):
+def _pick_cleaning_roles(db: Session, g1_num: int, g2_num: int):
     """Helper to pick an encargado and a supervisor from two group numbers."""
-    group_ids = await _get_group_ids_by_numbers(db, g1_num, g2_num)
+    group_ids = _get_group_ids_by_numbers(db, g1_num, g2_num)
     if not group_ids:
         return None, None
 
     students_query = select(Student).join(
         StudentGroup, Student.id == StudentGroup.student_id
     ).where(StudentGroup.group_id.in_(group_ids), Student.status == "Activo")
-    students_res = await db.execute(students_query)
+    students_res = db.execute(students_query)
     students = students_res.scalars().all()
 
     if not students:
@@ -70,7 +70,7 @@ async def _pick_cleaning_roles(db: AsyncSession, g1_num: int, g2_num: int):
     supervisor = None
 
     if encargado_candidates:
-        encargado_last_dates = await _get_last_role_dates(db, [s.id for s in encargado_candidates], "encargado_id")
+        encargado_last_dates = _get_last_role_dates(db, [s.id for s in encargado_candidates], "encargado_id")
         sorted_encargados = _sort_by_least_recent(encargado_candidates, encargado_last_dates)
         encargado = sorted_encargados[0]
 
@@ -80,26 +80,26 @@ async def _pick_cleaning_roles(db: AsyncSession, g1_num: int, g2_num: int):
         selected_group = elder_candidates or ministerial_candidates
 
         if selected_group:
-            supervisor_last_dates = await _get_last_role_dates(db, [s.id for s in selected_group], "supervisor_id")
+            supervisor_last_dates = _get_last_role_dates(db, [s.id for s in selected_group], "supervisor_id")
             sorted_supervisors = _sort_by_least_recent(selected_group, supervisor_last_dates)
             supervisor = sorted_supervisors[0]
 
     if encargado and supervisor and encargado.id == supervisor.id:
         alternative = [s for s in supervisor_candidates if s.id != encargado.id]
         if alternative:
-            supervisor_last_dates = await _get_last_role_dates(db, [s.id for s in alternative], "supervisor_id")
+            supervisor_last_dates = _get_last_role_dates(db, [s.id for s in alternative], "supervisor_id")
             sorted_alternatives = _sort_by_least_recent(alternative, supervisor_last_dates)
             supervisor = sorted_alternatives[0]
 
     return encargado, supervisor
 
-async def generate_cleaning_pairs(db: AsyncSession, n_parejas_a_generar: int = 5, start_date: str = None):
+def generate_cleaning_pairs(db: Session, n_parejas_a_generar: int = 5, start_date: str = None):
     """
     Genera e inserta emparejamientos cíclicos basándose en el historial de la base de datos
     y la secuencia base de 15 parejas.
     """
     query = select(CleaningHistory).order_by(desc(CleaningHistory.id)).limit(1)
-    result = await db.execute(query)
+    result = db.execute(query)
     last_record = result.scalar_one_or_none()
 
     start_index = 0
@@ -131,7 +131,7 @@ async def generate_cleaning_pairs(db: AsyncSession, n_parejas_a_generar: int = 5
         g1_num, g2_num = SECUENCIA_BASE[current_index]
         end_date = current_date + timedelta(days=6)
 
-        encargado, supervisor = await _pick_cleaning_roles(db, g1_num, g2_num)
+        encargado, supervisor = _pick_cleaning_roles(db, g1_num, g2_num)
 
         nuevo_registro = CleaningHistory(
             grupo1=g1_num,
@@ -154,7 +154,7 @@ async def generate_cleaning_pairs(db: AsyncSession, n_parejas_a_generar: int = 5
     nuevos_registros = [r for r, _, _ in registros_con_nombres]
     if nuevos_registros:
         db.add_all(nuevos_registros)
-        await db.commit()
+        db.commit()
 
     return [
         {
@@ -169,7 +169,7 @@ async def generate_cleaning_pairs(db: AsyncSession, n_parejas_a_generar: int = 5
         for r, enc_name, sup_name in registros_con_nombres
     ]
 
-async def assign_cleaning_roles_for_week(db: AsyncSession, reference_date: str = None):
+def assign_cleaning_roles_for_week(db: Session, reference_date: str = None):
     """
     Asigna encargados y supervisores a todos los registros de aseo que aún no tienen
     uno o ambos roles.
@@ -180,7 +180,7 @@ async def assign_cleaning_roles_for_week(db: AsyncSession, reference_date: str =
     ).where(
         or_(CleaningHistory.encargado_id == None, CleaningHistory.supervisor_id == None)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     records = result.scalars().all()
 
     if not records:
@@ -191,7 +191,7 @@ async def assign_cleaning_roles_for_week(db: AsyncSession, reference_date: str =
 
     for record in records:
         if not record.encargado_id or not record.supervisor_id:
-            encargado, supervisor = await _pick_cleaning_roles(db, record.grupo1, record.grupo2)
+            encargado, supervisor = _pick_cleaning_roles(db, record.grupo1, record.grupo2)
 
             if not record.encargado_id and encargado:
                 record.encargado_id = encargado.id
@@ -215,11 +215,11 @@ async def assign_cleaning_roles_for_week(db: AsyncSession, reference_date: str =
         )
 
     if changed:
-        await db.commit()
+        db.commit()
 
     return updated_records
 
-async def get_cleaning_history(db: AsyncSession, limit: int = 20):
+def get_cleaning_history(db: Session, limit: int = 20):
     """
     Obtiene los últimos N registros de limpieza con sus encargados y supervisores.
     """
@@ -228,7 +228,7 @@ async def get_cleaning_history(db: AsyncSession, limit: int = 20):
         selectinload(CleaningHistory.supervisor)
     ).order_by(desc(CleaningHistory.id)).limit(limit)
 
-    result = await db.execute(query)
+    result = db.execute(query)
     records = result.scalars().all()
 
     return [

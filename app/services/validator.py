@@ -1,10 +1,10 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, desc
 from app.models.program import AssignmentHistory, MeetingProgram
 from app.models.student import Student
 from collections import defaultdict
 
-async def validate_program_payload(db: AsyncSession, payload: dict, prog_id: int = None):
+def validate_program_payload(db: Session, payload: dict, prog_id: int = None):
     warnings = []
     
     parts = payload.get("parts", [])
@@ -62,14 +62,14 @@ async def validate_program_payload(db: AsyncSession, payload: dict, prog_id: int
         recent_query = recent_query.filter(MeetingProgram.id != prog_id)
     recent_query = recent_query.limit(5)
     
-    res_recent = await db.execute(recent_query)
+    res_recent = db.execute(recent_query)
     recent_program_ids = [row for row in res_recent.scalars().all()]
     
     # Obtener nombres de historial reciente
     recent_names = set()
     if recent_program_ids:
         hist_query = select(AssignmentHistory.student_name, AssignmentHistory.assistant_name).where(AssignmentHistory.program_id.in_(recent_program_ids))
-        res_hist = await db.execute(hist_query)
+        res_hist = db.execute(hist_query)
         for row in res_hist.fetchall():
             if row[0]: recent_names.add(row[0].strip().lower())
             if row[1]: recent_names.add(row[1].strip().lower())
@@ -78,7 +78,7 @@ async def validate_program_payload(db: AsyncSession, payload: dict, prog_id: int
     pairs_query = select(AssignmentHistory.student_name, AssignmentHistory.assistant_name)
     if prog_id:
         pairs_query = pairs_query.filter(AssignmentHistory.program_id != prog_id)
-    res_pairs = await db.execute(pairs_query)
+    res_pairs = db.execute(pairs_query)
     historical_pairs = set()
     for row in res_pairs.fetchall():
         if row[0] and row[1]:
@@ -93,7 +93,7 @@ async def validate_program_payload(db: AsyncSession, payload: dict, prog_id: int
         # Workaround since SQLite doesn't have any_() and postgres needs it correctly formed
         # Instead, just query all active students or use IN
         student_query = select(Student)
-        res_students = await db.execute(student_query)
+        res_students = db.execute(student_query)
         for s in res_students.scalars().all():
             students_dict[s.name.strip().lower()] = s
 
