@@ -12,3 +12,7 @@ python-multipart
 PyJWT
 bcrypt
 email-validator
+PyPDF2
+requests
+beautifulsoup4
+lxml

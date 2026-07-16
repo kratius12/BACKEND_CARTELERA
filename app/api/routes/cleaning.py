@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
 
 from app.api.dependencies import get_db
-from app.services.cleaning import generate_cleaning_pairs, get_cleaning_history
+from app.services.cleaning import generate_cleaning_pairs, get_cleaning_history, assign_cleaning_roles_for_week
 
 router = APIRouter()
 
@@ -34,5 +34,19 @@ async def api_generate_cleaning_pairs(
     try:
         nuevas_parejas = await generate_cleaning_pairs(db, n_parejas_a_generar=n_pairs, start_date=start_date)
         return nuevas_parejas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/assign-roles", response_model=List[Dict[str, Any]])
+async def api_assign_cleaning_roles(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Asigna encargados y supervisores automáticamente a todos los registros de aseo
+    que todavía no tienen encargado o supervisor.
+    """
+    try:
+        asignaciones = await assign_cleaning_roles_for_week(db)
+        return asignaciones
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

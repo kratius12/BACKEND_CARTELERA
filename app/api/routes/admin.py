@@ -9,6 +9,7 @@ from app.api.dependencies import get_db
 from app.schemas.program import ProgramCreate, ProgramUpdate, ProgramListResponse, ProgramResponse
 from app.crud import program as crud_program
 from app.services.pdf_parser import parse_mwb_pdf
+from app.services.mwb_scraper import parse_mwb_from_url
 
 from fastapi import Request
 
@@ -62,7 +63,12 @@ async def upload_pdf_program(file: UploadFile = File(...), db: AsyncSession = De
             
         # Parse the pdf
         parsed_programs = parse_mwb_pdf(temp_path, file.filename)
-        
+        if not parsed_programs:
+            raise HTTPException(
+                status_code=400,
+                detail="El PDF se procesó correctamente, pero no se pudo extraer ningún programa. Revisa el formato de la guía."
+            )
+
         # Save each parsed program to staging
         created_ids = []
         for program_data in parsed_programs:
@@ -83,20 +89,52 @@ async def upload_pdf_program(file: UploadFile = File(...), db: AsyncSession = De
             created_ids.append(db_prog.id)
             
         return {"message": f"Se extrajeron {len(created_ids)} programas", "ids": created_ids}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Cleanup
-        os.close(fd)
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@router.put("/staging/{prog_id}")
-async def update_program_in_staging(prog_id: int, program: ProgramUpdate, db: AsyncSession = Depends(get_db)):
-    updated_id = await crud_program.update_staging_program(db, prog_id, program)
+        try:
+            os.close(fd)
+        except Exception:
+            pass
     if not updated_id:
         raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
     return {"id": updated_id, "message": "Staging actualizado"}
+
+
+@router.post("/import-url", status_code=status.HTTP_201_CREATED)
+async def import_mwb_from_url(request: Request, db: AsyncSession = Depends(get_db)):
+    data = await request.json()
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Se requiere el campo 'url'")
+
+    try:
+        parsed_programs = parse_mwb_from_url(url)
+        if not parsed_programs:
+            raise HTTPException(status_code=400, detail="No se extrajeron programas desde la URL proporcionada")
+
+        created_ids = []
+        for program_data in parsed_programs:
+            p_week_start = program_data.pop("week_start")
+            p_week_end = program_data.pop("week_end")
+
+            p_create = ProgramCreate(
+                week_start=p_week_start,
+                week_end=p_week_end,
+                payload=program_data
+            )
+
+            db_prog = await crud_program.create_staging_program(db, p_create)
+            created_ids.append(db_prog.id)
+
+        return {"message": f"Se extrajeron {len(created_ids)} programas desde la URL", "ids": created_ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/staging/{prog_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_staging_prog(prog_id: int, db: AsyncSession = Depends(get_db)):

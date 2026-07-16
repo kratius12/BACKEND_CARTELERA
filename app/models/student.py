@@ -14,4 +14,6 @@ class Student(Base):
     aseo = Column(Boolean, default=False)
     acomodador = Column(Boolean, default=False)
     microfonos = Column(Boolean, default=False)
+    es_anciano = Column(Boolean, default=False, nullable=False)
+    es_siervo = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -11,9 +11,11 @@ class StudentBase(BaseModel):
     aseo: bool = False
     acomodador: bool = False
     microfonos: bool = False
+    es_anciano: bool = False
+    es_siervo: bool = False
     created_at: Optional[datetime] = None
 
-    @field_validator('aseo', 'acomodador', 'microfonos', mode='before')
+    @field_validator('aseo', 'acomodador', 'microfonos', 'es_anciano', 'es_siervo', mode='before')
     @classmethod
     def set_false_if_none(cls, v):
         return v if v is not None else False
