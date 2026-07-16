@@ -5,19 +5,19 @@ from app.core.config import settings
 
 # Usa URL interna de Railway si está disponible, si no la pública
 db_url = settings.db_url
-if db_url.startswith("postgresql://"):
-    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+if db_url.startswith("postgresql+asyncpg://"):
+    db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 elif db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
 
-# NullPool: una conexión nueva por request, sin pool en background.
-# Evita que health checks del pool crasheen el proceso en Railway.
-# ssl=False: TCP plano, sin negociación SSL (Railway proxy lo requiere así).
+# psycopg (v3) maneja SSL igual que libpq: negocia automáticamente.
+# NullPool: una conexión por request, sin pool en background.
 engine = create_async_engine(
     db_url,
     echo=False,
     poolclass=NullPool,
-    connect_args={"ssl": False},
 )
 
 AsyncSessionLocal = async_sessionmaker(
