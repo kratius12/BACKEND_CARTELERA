@@ -32,8 +32,6 @@ class Settings(BaseSettings):
     def get_allowed_origins(self) -> list[str]:
         """Devuelve la lista de orígenes permitidos para CORS."""
         if not self.ALLOWED_ORIGINS.strip():
-            # Con credentials=True, "*" no funciona — devolver lista vacía
-            # para que el dev sepa que debe configurar ALLOWED_ORIGINS
             return []
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 

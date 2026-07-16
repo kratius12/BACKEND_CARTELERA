@@ -14,13 +14,25 @@ FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.
 app = FastAPI(title="Cartelera API", version="1.0.0")
 
 allowed_origins = settings.get_allowed_origins()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+# Si hay orígenes específicos configurados usamos credentials=True,
+# si no, abrimos a todos sin credentials (JWT va en header, no cookie)
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Rutas de la API (Backend real)
 app.include_router(api_router, prefix="/api")
