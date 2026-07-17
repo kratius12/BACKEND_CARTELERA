@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select, insert, delete, update
 from sqlalchemy.exc import NoResultFound
+from fastapi import HTTPException
 
 from app.models.group import Group
 from app.models.student_group import StudentGroup
@@ -97,7 +98,7 @@ def update_student_role(
     db.commit()
     bridge = result.scalars().first()
     if not bridge:
-        raise NoResultFound("Assignment not found")
+        raise HTTPException(status_code=404, detail="Asignación no encontrada")
     return StudentGroupRead.model_validate(bridge)
 
 def remove_student_from_group(
