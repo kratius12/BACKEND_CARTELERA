@@ -6,3 +6,4 @@ from app.models.cleaning import CleaningHistory
 from app.models.group import Group
 from app.models.student_group import StudentGroup
 from app.models.assignments import MicrophoneAssignment, AttendantAssignment
+from app.models.preaching_report import PreachingReport, GroupReportLink
