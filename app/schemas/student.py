@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -13,12 +13,27 @@ class StudentBase(BaseModel):
     microfonos: bool = False
     es_anciano: bool = False
     es_siervo: bool = False
+    # Precursorado: como mucho uno en True
+    es_precursor_aux_camp: bool = False
+    es_precursor_aux_ind: bool = False
+    es_precursor_reg: bool = False
     created_at: Optional[datetime] = None
 
-    @field_validator('aseo', 'acomodador', 'microfonos', 'es_anciano', 'es_siervo', mode='before')
+    @field_validator(
+        'aseo', 'acomodador', 'microfonos', 'es_anciano', 'es_siervo',
+        'es_precursor_aux_camp', 'es_precursor_aux_ind', 'es_precursor_reg',
+        mode='before',
+    )
     @classmethod
     def set_false_if_none(cls, v):
         return v if v is not None else False
+
+    @model_validator(mode='after')
+    def un_solo_precursorado(self):
+        marcados = [self.es_precursor_aux_camp, self.es_precursor_aux_ind, self.es_precursor_reg]
+        if sum(bool(m) for m in marcados) > 1:
+            raise ValueError("Solo se puede marcar un tipo de precursorado (auxiliar en campaña, auxiliar indefinido o regular).")
+        return self
 
 class StudentCreate(StudentBase):
     pass
