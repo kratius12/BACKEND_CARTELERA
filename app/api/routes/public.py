@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import date
 
 from app.api.dependencies import get_db
@@ -80,6 +80,28 @@ def get_full_schedule(db: Session = Depends(get_db)):
             } for a in attendants
         ]
     }
+
+@router.get("/weekend")
+def get_weekend_schedule(
+    start: Optional[date] = Query(None, description="Primer sábado (YYYY-MM-DD). Por defecto, el de esta semana."),
+    weeks: int = Query(14, ge=1, le=60, description="Cantidad de sábados"),
+    db: Session = Depends(get_db),
+):
+    """Fin de semana para la hoja impresa: fecha, presidente y lector de cada sábado."""
+    from app.services.weekend import schedule
+    return schedule.public_rows(db, start, weeks)
+
+
+@router.get("/sound")
+def get_sound_schedule(
+    start: Optional[date] = Query(None, description="Primer sábado (YYYY-MM-DD). Por defecto, el de esta semana."),
+    weeks: int = Query(9, ge=1, le=60, description="Cantidad de semanas"),
+    db: Session = Depends(get_db),
+):
+    """Sonido para la hoja impresa: semana, audio y video, micrófonos y Zoom."""
+    from app.services.sound import schedule
+    return schedule.public_rows(db, start, weeks)
+
 
 @router.get("/current")
 def get_current_program(db: Session = Depends(get_db)):

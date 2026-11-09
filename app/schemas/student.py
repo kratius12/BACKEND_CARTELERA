@@ -17,11 +17,20 @@ class StudentBase(BaseModel):
     es_precursor_aux_camp: bool = False
     es_precursor_aux_ind: bool = False
     es_precursor_reg: bool = False
+    # Fin de semana: presidencia y lectura del estudio de La Atalaya
+    fds_presidente: bool = False
+    fds_lector: bool = False
+    # Sonido: audio y video, micrófonos y Zoom
+    sonido_audio_video: bool = False
+    sonido_microfonos: bool = False
+    sonido_zoom: bool = False
     created_at: Optional[datetime] = None
 
     @field_validator(
         'aseo', 'acomodador', 'microfonos', 'es_anciano', 'es_siervo',
         'es_precursor_aux_camp', 'es_precursor_aux_ind', 'es_precursor_reg',
+        'fds_presidente', 'fds_lector',
+        'sonido_audio_video', 'sonido_microfonos', 'sonido_zoom',
         mode='before',
     )
     @classmethod

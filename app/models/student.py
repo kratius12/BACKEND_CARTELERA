@@ -27,4 +27,11 @@ class Student(Base):
     es_precursor_aux_camp = Column(Boolean, default=False, server_default=false(), nullable=False)  # auxiliar en campaña
     es_precursor_aux_ind = Column(Boolean, default=False, server_default=false(), nullable=False)   # auxiliar indefinido
     es_precursor_reg = Column(Boolean, default=False, server_default=false(), nullable=False)       # regular
+    # Fin de semana: puede presidir o leer en el estudio de La Atalaya (solo varones)
+    fds_presidente = Column(Boolean, default=False, server_default=false(), nullable=False)
+    fds_lector = Column(Boolean, default=False, server_default=false(), nullable=False)
+    # Sonido: audio y video, micrófonos (puesto de sonido) y Zoom (solo varones)
+    sonido_audio_video = Column(Boolean, default=False, server_default=false(), nullable=False)
+    sonido_microfonos = Column(Boolean, default=False, server_default=false(), nullable=False)
+    sonido_zoom = Column(Boolean, default=False, server_default=false(), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
