@@ -2,16 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.api.dependencies import get_db, get_current_admin_user
+from app.api.dependencies import get_db, require_permission
 from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
 from app.crud import student as crud_student
 
 router = APIRouter()
 
+# Leer y actualizar estudiantes: módulo Estudiantes o Grupos (el tablero de grupos
+# lista a las personas y cambia sus asignaciones de aseo, acomodador y micrófonos).
+# Crear y borrar: solo el módulo Estudiantes.
+read_or_update = require_permission("students", "groups")
+students_only = require_permission("students")
+
+
 @router.get("", response_model=List[StudentResponse])
 def list_students(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_user)
+    current_user = Depends(read_or_update)
 ):
     return crud_student.get_students(db)
 
@@ -19,7 +26,7 @@ def list_students(
 def create_student(
     student: StudentCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_user)
+    current_user = Depends(students_only)
 ):
     try:
         return crud_student.create_student(db, student)
@@ -33,7 +40,7 @@ def update_student(
     student_id: int,
     student: StudentUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_user)
+    current_user = Depends(read_or_update)
 ):
     try:
         db_student = crud_student.update_student(db, student_id, student)
@@ -47,7 +54,7 @@ def update_student(
 def delete_student(
     student_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_user)
+    current_user = Depends(students_only)
 ):
     success = crud_student.delete_student(db, student_id)
     if not success:

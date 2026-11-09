@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_admin_user, get_db
+from app.api.dependencies import get_db, require_permission
 from app.schemas.groups import GroupCreate, StudentGroupCreate, StudentGroupRead, GroupRead, StudentGroupUpdate
 from app.services.group_service import (
     get_groups,
@@ -14,12 +14,12 @@ from app.services.group_service import (
 router = APIRouter()
 
 @router.get("/", response_model=list)
-def list_groups(db: Session = Depends(get_db), _: dict = Depends(get_current_admin_user)):
+def list_groups(db: Session = Depends(get_db), _: dict = Depends(require_permission("groups"))):
     """Return all groups with their assigned students."""
     return get_groups(db)
 
 @router.post("/", response_model=GroupRead, status_code=status.HTTP_201_CREATED)
-def create_new_group(payload: GroupCreate, db: Session = Depends(get_db), _: dict = Depends(get_current_admin_user)):
+def create_new_group(payload: GroupCreate, db: Session = Depends(get_db), _: dict = Depends(require_permission("groups"))):
     """Create a new group."""
     return create_group(db, payload)
 
@@ -28,7 +28,7 @@ def assign_student(
     group_id: UUID,
     payload: StudentGroupCreate,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_admin_user),
+    _: dict = Depends(require_permission("groups")),
 ):
     """Assign a student to a group."""
     return add_student_to_group(db, group_id, payload)
@@ -38,7 +38,7 @@ def unassign_student(
     group_id: UUID,
     student_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_admin_user),
+    _: dict = Depends(require_permission("groups")),
 ):
     """Remove a student from a group."""
     remove_student_from_group(db, group_id, student_id)
@@ -50,7 +50,7 @@ def update_assignment(
     student_id: int,
     payload: StudentGroupUpdate, 
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_admin_user),
+    _: dict = Depends(require_permission("groups")),
 ):
     """Update student role/info in a group."""
     from app.services.group_service import update_student_role

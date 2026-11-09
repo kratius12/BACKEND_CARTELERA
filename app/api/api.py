@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from app.api.routes import health, public, admin, auth, users, students, cleaning, groups, assignments, schedule
-from app.api.routes import preaching_reports, group_reports
-from app.api.dependencies import get_current_admin_user
+from app.api.routes import preaching_reports, group_reports, weekend, sound
+from app.api.dependencies import require_permission
 
+# Cada grupo de rutas del panel exige su módulo (ver app/core/permissions.py)
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(public.router, prefix="/programs", tags=["programs"])
@@ -10,40 +11,62 @@ api_router.include_router(
     admin.router, 
     prefix="/admin/programs", 
     tags=["admin"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("programs"))]
 )
 api_router.include_router(
     students.router,
     prefix="/admin/students",
     tags=["students"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("students", "groups"))]
 )
 api_router.include_router(
     cleaning.router,
     prefix="/admin/cleaning",
     tags=["cleaning"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("assignments"))]
 )
 api_router.include_router(
     assignments.router,
     prefix="/admin/assignments",
     tags=["assignments"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("assignments"))]
 )
 api_router.include_router(
     schedule.router,
     prefix="/admin/schedule",
     tags=["schedule"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("assignments"))]
+)
+api_router.include_router(
+    weekend.router,
+    prefix="/admin/weekend",
+    tags=["weekend"],
+    dependencies=[Depends(require_permission("weekend"))]
+)
+api_router.include_router(
+    sound.router,
+    prefix="/admin/sound",
+    tags=["sound"],
+    dependencies=[Depends(require_permission("sound"))]
 )
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(groups.router, prefix="/groups", tags=["groups"])
+api_router.include_router(
+    users.router,
+    prefix="/users",
+    tags=["users"],
+    dependencies=[Depends(require_permission("users"))]
+)
+api_router.include_router(
+    groups.router,
+    prefix="/groups",
+    tags=["groups"],
+    dependencies=[Depends(require_permission("groups"))]
+)
 api_router.include_router(
     preaching_reports.router,
     prefix="/admin/preaching-reports",
     tags=["preaching-reports"],
-    dependencies=[Depends(get_current_admin_user)]
+    dependencies=[Depends(require_permission("reports"))]
 )
 # Link secreto por grupo: sin login, solo ese grupo
 api_router.include_router(group_reports.router, prefix="/group-reports", tags=["group-reports"])
