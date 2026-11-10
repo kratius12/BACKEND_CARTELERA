@@ -136,8 +136,10 @@ def update_staging_program(db: Session, prog_id: int, program: ProgramUpdate):
         .returning(MeetingProgramStaging.id)
     )
     result = db.execute(stmt)
+    # Leer el id devuelto antes del commit: después el cursor ya está cerrado
+    updated_id = result.scalar_one_or_none()
     db.commit()
-    return result.scalar_one_or_none()
+    return updated_id
 
 def delete_staging_program(db: Session, prog_id: int):
     stmt = delete(MeetingProgramStaging).where(MeetingProgramStaging.id == prog_id)
@@ -157,12 +159,15 @@ def update_program(db: Session, prog_id: int, program: ProgramUpdate):
         .returning(MeetingProgram.id)
     )
     result = db.execute(stmt)
-    
+    # Leer el id devuelto antes de seguir usando la conexión: después el cursor ya está cerrado
+    updated_id = result.scalar_one_or_none()
+
     # Update assignment history
-    _sync_assignment_history(db, prog_id, program.week_start, program.payload)
-    
+    if updated_id is not None:
+        _sync_assignment_history(db, prog_id, program.week_start, program.payload)
+
     db.commit()
-    return result.scalar_one_or_none()
+    return updated_id
 
 def delete_program(db: Session, prog_id: int):
     stmt = delete(MeetingProgram).where(MeetingProgram.id == prog_id)

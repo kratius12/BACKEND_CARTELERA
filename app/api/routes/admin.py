@@ -134,6 +134,14 @@ def delete_staging_prog(prog_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
     return None
 
+@router.put("/staging/{prog_id}")
+def update_staging_prog(prog_id: int, program: ProgramUpdate, db: Session = Depends(get_db)):
+    """Guarda los cambios de un programa temporal (el editor de /admin/programas/temporales/:id/editar)."""
+    updated_id = crud_program.update_staging_program(db, prog_id, program)
+    if not updated_id:
+        raise HTTPException(status_code=404, detail="Programa no encontrado en staging")
+    return {"id": updated_id, "message": "Programa temporal actualizado"}
+
 @router.post("/{prog_id}/publish")
 def publish_program(prog_id: int, db: Session = Depends(get_db)):
     db_prog = crud_program.publish_program(db, prog_id)
