@@ -89,9 +89,7 @@ def validate_program_payload(db: Session, payload: dict, prog_id: int = None):
     all_names = list(name_counts.keys())
     students_dict = {}
     if all_names:
-        student_query = select(Student).filter(Student.name.ilike(any_(all_names)))
-        # Workaround since SQLite doesn't have any_() and postgres needs it correctly formed
-        # Instead, just query all active students or use IN
+        # Se traen todos los estudiantes y se comparan por nombre en minúsculas
         student_query = select(Student)
         res_students = db.execute(student_query)
         for s in res_students.scalars().all():
