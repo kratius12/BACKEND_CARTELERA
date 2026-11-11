@@ -13,6 +13,25 @@ from app.services.mwb_scraper import parse_mwb_from_url
 
 router = APIRouter()
 
+
+@router.get("/people")
+def list_program_people(db: Session = Depends(get_db)):
+    """Estudiantes para elegir encargados, presidente y oraciones en el formulario del programa."""
+    from sqlalchemy import select
+    from app.models.student import Student
+    students = db.execute(select(Student).order_by(Student.name)).scalars().all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "gender": s.gender,  # 1 = hermano, 0 = hermana, None = sin dato
+            "active": (s.status or "").strip().lower() == "activo",
+            "privilege": "Anciano" if s.es_anciano else ("Siervo ministerial" if s.es_siervo else None),
+        }
+        for s in students
+    ]
+
+
 @router.post("/generate-proposal")
 def generate_proposal_endpoint(data: dict = Body(...), db: Session = Depends(get_db)):
     items = data.get("items", [])
