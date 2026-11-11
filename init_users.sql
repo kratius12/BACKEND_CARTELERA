@@ -29,7 +29,7 @@ VALUES (
     'admin',
     'active',
     true,
-    '["programs", "students", "groups", "assignments", "weekend", "sound", "reports", "users"]',
+    '["programs", "students", "groups", "assignments", "weekend", "sound", "talks", "reports", "users"]',
     now()
 )
 ON CONFLICT (email) DO NOTHING;

@@ -84,7 +84,7 @@ class CurrentUser(BaseModel):
 
 
 # ─── Gestión de usuarios ───
-Module = Literal["programs", "students", "groups", "assignments", "weekend", "sound", "reports", "users"]
+Module = Literal["programs", "students", "groups", "assignments", "weekend", "sound", "talks", "reports", "users"]
 
 
 class UserBase(BaseModel):

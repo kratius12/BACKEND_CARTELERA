@@ -5,7 +5,9 @@ Reglas comunes:
 - Una misma persona no puede tener dos roles en la misma fila.
 - Nadie puede tener aseo, micrófonos ni acomodador la semana de cada reunión que
   cubre la fila (ver app/services/availability.py), ni las partes que agregue
-  extra_busy (por ejemplo, Fin de semana y Sonido se revisan entre sí).
+  extra_busy (por ejemplo, Fin de semana y Sonido se revisan entre sí). En aseo,
+  cleaning_blocks dice qué cuenta: los grupos que limpian, el encargado y el
+  supervisor (por defecto los tres).
 """
 import random
 from dataclasses import dataclass
@@ -23,6 +25,7 @@ MONTHS = (
     "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 )
 WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+CLEANING_ALL = frozenset({"grupo", "encargado", "supervisor"})
 
 
 class ScheduleError(Exception):
@@ -86,6 +89,7 @@ class SaturdaySchedule:
         label: Callable[[date, Optional[date]], str],
         default_midweek: Optional[Callable[[date], date]] = None,
         extra_busy: Optional[Callable[[Session, list[date]], dict]] = None,
+        cleaning_blocks: frozenset = CLEANING_ALL,
     ):
         self.name = name                    # "Fin de semana"
         self.model = model
@@ -95,6 +99,7 @@ class SaturdaySchedule:
         self.label = label
         self.default_midweek = default_midweek
         self.extra_busy = extra_busy
+        self.cleaning_blocks = cleaning_blocks  # "grupo", "encargado", "supervisor"
 
     @property
     def has_midweek(self) -> bool:
@@ -134,6 +139,8 @@ class SaturdaySchedule:
             for day, suffix in plan:
                 for student_id, reasons in by_date.get(day, {}).items():
                     for reason in reasons:
+                        if reason.get("aseo") and reason["aseo"] not in self.cleaning_blocks:
+                            continue
                         label = f"{reason['label']} {suffix}" if suffix else reason["label"]
                         availability.add_reason(out, student_id, reason["kind"], label)
             for student_id, reasons in extra.get(saturday, {}).items():

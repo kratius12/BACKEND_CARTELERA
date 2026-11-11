@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.api.routes import health, public, admin, auth, users, students, cleaning, groups, assignments, schedule
-from app.api.routes import preaching_reports, group_reports, weekend, sound
+from app.api.routes import preaching_reports, group_reports, weekend, sound, talks
 from app.api.dependencies import require_permission
 
 # Cada grupo de rutas del panel exige su módulo (ver app/core/permissions.py)
@@ -48,6 +48,12 @@ api_router.include_router(
     prefix="/admin/sound",
     tags=["sound"],
     dependencies=[Depends(require_permission("sound"))]
+)
+api_router.include_router(
+    talks.router,
+    prefix="/admin/talks",
+    tags=["talks"],
+    dependencies=[Depends(require_permission("talks"))]
 )
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(

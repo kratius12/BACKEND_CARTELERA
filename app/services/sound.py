@@ -1,10 +1,12 @@
 """Sonido: audio y video, micrófonos y Zoom; una fila por semana.
 
 Cada fila va del sábado a la reunión de entre semana siguiente (por defecto el día
-de MIDWEEK_MEETING_WEEKDAY, martes). Se revisan las dos semanas: nadie puede tener
-aseo, micrófonos (la asignación de /admin/microfonos) ni acomodador en la semana del
-sábado ni en la de la reunión de entre semana. Tampoco puede presidir o leer el
-sábado (Fin de semana). Las demás reglas están en app/services/saturday_schedule.py.
+de MIDWEEK_MEETING_WEEKDAY, martes). Se revisan las dos semanas: nadie puede ser
+encargado de aseo, tener micrófonos (la asignación de /admin/microfonos) ni ser
+acomodador en la semana del sábado ni en la de la reunión de entre semana. Que su
+grupo tenga aseo esa semana no lo bloquea, ni ser supervisor de aseo. Tampoco puede
+presidir o leer el sábado (Fin de semana). Las demás reglas están en
+app/services/saturday_schedule.py.
 """
 from datetime import date, timedelta
 
@@ -61,4 +63,6 @@ schedule = SaturdaySchedule(
     label=label,
     default_midweek=default_midweek,
     extra_busy=_weekend_parts,
+    # En sonido solo cuenta ser encargado de aseo; el resto del grupo sí puede estar
+    cleaning_blocks=frozenset({"encargado"}),
 )

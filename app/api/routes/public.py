@@ -103,6 +103,19 @@ def get_sound_schedule(
     return schedule.public_rows(db, start, weeks)
 
 
+@router.get("/talks")
+def get_talks_month(
+    month: str = Query(..., description="Mes (AAAA-MM)"),
+    db: Session = Depends(get_db),
+):
+    """Conferencias del mes para la hoja impresa (sin teléfonos)."""
+    from app.services import talks as talks_svc
+    try:
+        return talks_svc.public_month(db, month)
+    except talks_svc.TalkError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.message)
+
+
 @router.get("/current")
 def get_current_program(db: Session = Depends(get_db)):
     today = date.today()
