@@ -1,7 +1,9 @@
 """Quién ya tiene aseo, micrófonos o acomodador en la semana de una fecha.
 
 La semana de una fecha va de lunes a domingo. Aseo cuenta a todos los integrantes
-de los dos grupos que limpian esa semana, más el encargado y el supervisor.
+de los dos grupos que limpian esa semana, más el encargado y el supervisor. Cada
+motivo de aseo dice cuál de los tres es (clave "aseo": "grupo", "encargado" o
+"supervisor") para que cada programa decida cuáles lo bloquean.
 """
 import re
 from datetime import date, timedelta
@@ -36,12 +38,12 @@ def _members_by_group_number(db: Session) -> dict[int, set[int]]:
     return members
 
 
-def add_reason(target: dict[int, list[dict]], student_id, kind: str, label: str) -> None:
+def add_reason(target: dict[int, list[dict]], student_id, kind: str, label: str, **extra) -> None:
     if student_id is None:
         return
     reasons = target.setdefault(student_id, [])
     if not any(r["label"] == label for r in reasons):
-        reasons.append({"kind": kind, "label": label})
+        reasons.append({"kind": kind, "label": label, **extra})
 
 
 def busy_for_dates(db: Session, dates) -> dict[date, dict[int, list[dict]]]:
@@ -67,11 +69,11 @@ def busy_for_dates(db: Session, dates) -> dict[date, dict[int, list[dict]]]:
             for day in dates:
                 if not (record.week_start <= day <= record.week_end):
                     continue
-                add_reason(result[day], record.encargado_id, "aseo", "Encargado de aseo")
-                add_reason(result[day], record.supervisor_id, "aseo", "Supervisor de aseo")
+                add_reason(result[day], record.encargado_id, "aseo", "Encargado de aseo", aseo="encargado")
+                add_reason(result[day], record.supervisor_id, "aseo", "Supervisor de aseo", aseo="supervisor")
                 for number in (record.grupo1, record.grupo2):
                     for student_id in members.get(number, ()):
-                        add_reason(result[day], student_id, "aseo", f"Aseo (grupo {number})")
+                        add_reason(result[day], student_id, "aseo", f"Aseo (grupo {number})", aseo="grupo")
 
     for model, kind, label in (
         (MicrophoneAssignment, "microfonos", "Micrófonos"),

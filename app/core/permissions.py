@@ -12,6 +12,7 @@ MODULES = {
     "assignments": "Asignaciones",
     "weekend": "Fin de semana",
     "sound": "Sonido",
+    "talks": "Conferencias",
     "reports": "Informes de predicación",
     "users": "Usuarios y permisos",
 }
